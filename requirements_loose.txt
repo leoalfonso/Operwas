@@ -1,0 +1,18 @@
+autopep8
+gdal
+matplotlib
+networkx
+numpy
+pandas
+pillow
+platypus-opt
+pygeoprocessing
+rtree
+scipy
+seaborn
+pyshp
+# tkinter should be installed via apt
+rasterio
+tk
+wheel
+xlrd

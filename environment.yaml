@@ -1,0 +1,24 @@
+name: operwas_fast
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python==3.10.9
+  - GDAL
+  - rtree
+  - scipy
+  - matplotlib
+  - pandas
+  - xlrd
+  - pygeoprocessing
+  - platypus-opt
+  - pyshp
+  - seaborn
+  - geopandas
+  - rasterio
+  - autopep8
+  - networkx
+  - numpy
+  - tk
+  - wheel
+  - shapely
