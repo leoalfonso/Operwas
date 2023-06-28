@@ -1,3 +1,6 @@
+#This does exactly the same as operwas, but using the database produced with __init__.py in scr/faster/experiments
+#so it is faster.
+
 import pathlib
 
 import matplotlib.pyplot as plt

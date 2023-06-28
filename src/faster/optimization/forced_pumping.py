@@ -1,3 +1,6 @@
+# This can be deleted - it was an experiement.
+
+
 import copy
 import pathlib
 

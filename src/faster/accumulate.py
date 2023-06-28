@@ -1,3 +1,7 @@
+# This code ensures that accumulates different parameters depending on the direction of the flows.
+# For example, if a wwtp is now a pump, then the population served is the same, but the treated flow becomes zero,
+# but needs to be added to the flow of the donwnstream wwtp where the new pump goes
+
 from typing import Iterable, Optional
 
 import networkx as nx

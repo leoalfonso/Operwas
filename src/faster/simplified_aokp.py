@@ -1,3 +1,9 @@
+#This is a re-organised version of Maria's (Wunsch) verison.
+# It takes into account only the files that change during the optimisation
+# The files that do not need to change (e.g., all the GIS stuff), are in a database that is accessed by the optimiser
+# Database: in folder experimental_results, which are produced by another set of codes in src/faster/experiments,
+# many of them are using the original AOKP functions that run GDAL (they need to run one by one separated and take time)
+
 import os
 from subprocess import run
 
