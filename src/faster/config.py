@@ -1,3 +1,6 @@
+#This configuration file sets the paths and filenames and pump characteristics limits.
+#Read by genetic_pumping and by no_pumping.
+
 import os
 import pathlib
 from typing import Optional
@@ -63,8 +66,8 @@ WEIGHT_NODE_TYPE_WWPS = 1.0
 MUTATION_PROBABILITY = 0.1
 CROSSOVER_PROBABILITY = 0.2
 
-OPT_NUM_GENERATIONS = 50
-OPT_POPULATION_SIZE = 100
+OPT_NUM_GENERATIONS = 5
+OPT_POPULATION_SIZE = 10
 
 RUN_RESULTS_STORE_RESULTS_SOLUTIONS_INTERVAL: Optional[int] = 1
 RUN_RESULTS_STORE_RESULTS_TOTAL_INTERVAL: Optional[int] = 1

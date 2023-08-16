@@ -1,3 +1,11 @@
+# Important function here is feasibility_check, that is being used by the optimiser, see code.
+
+# The rest of the code uses networkx to find possible combinations of origin and destiny
+# This was made to know how the candidates would flow in the river (this is not the flow of the pumps). Here Maria Alice found that there was a mistake,
+# and therefore this is not used further, and instead, the directions of the flows were set manually in the file
+#wwtp_locations_many, which has the followiign strucutre: id,X,Y,connects_to (flow of the river goes from id to connects_to)
+# This file is not run during the optimisaiton
+
 import os
 
 import networkx as nx
@@ -84,6 +92,13 @@ NETWORK_LENGTH_MAX = GRAPH_DF["network_length"].sum()
 
 
 def feasibility_check(data_dict: dict[str, np.ndarray]) -> None:
+    '''
+    This checks if the limits of the max lengths are respected and if the population served is not counted twice.
+    This is checking every solution.
+    If there is something wrong, Platypus will not use this solution.
+    :param data_dict:
+    :return:
+    '''
     # Small value to account for numerical differences
     epsilon = 1e-1
     # Check population served by treatment plants (wwps populations do not count since

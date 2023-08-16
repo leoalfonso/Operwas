@@ -1,4 +1,4 @@
-name: operwas_fast
+name: operwas_pump
 channels:
   - conda-forge
   - defaults

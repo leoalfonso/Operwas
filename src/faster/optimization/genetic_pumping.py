@@ -1,3 +1,7 @@
+# This file runs the optimisation, reading the parameters in config.py, and writing
+# optimisation results in folder optimisation_results / run_{datetime}.csv.
+#
+
 import copy
 import pathlib
 

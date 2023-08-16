@@ -1,3 +1,5 @@
+# Experimental code - needs revision in the axis. It should give all the results and the Pareto Front
+
 import math
 
 import numpy as np
@@ -93,6 +95,7 @@ if __name__ == "__main__":
 
     ranks_sort, (x_sort, y_sort) = get_nondominated_sort((x, y), directions)
 
+    # (the best results in the last 50 GENERATIONS)
     n_top = 50
 
     import matplotlib.pyplot as plt
