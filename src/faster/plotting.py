@@ -3,11 +3,11 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 from matplotlib.figure import Figure
-from osgeo import gdalconst, ogr
+#from osgeo import gdalconst, ogr  #--import-mode=importlib
 
 from src.faster.custom_typing import Coordinate
 from src.faster.node_types import NodeType
-from src.faster.simplified_aokp import pre_AOKP
+#from src.faster.simplified_aokp import pre_AOKP
 from src.user_inputs import path_subcatchments
 
 

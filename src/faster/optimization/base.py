@@ -18,9 +18,17 @@ from src.faster.utils import (create_dir_with_unique_suffix,
                               parse_config_to_json)
 
 
-class OperwaFastBase(Problem):
+class OperwaFastBase(Problem):   #This is difficult to follow: in no_pumping there is an OperwaFast class that points here with super()
+    # Note for the future: the way this was built was to consider each of the 33 locations as a potential WWTP. This is good, but the algorithm
+    # is designed to randomly choose any number of WWTPs out of n_var=33. If we set nvar=3, then only the first three locations will be changed,
+    #which does not mean much, because in 9 iterations I have evaluated all the possibilities. Every attempt to run with the full 33 has failed to
+    #produce a solution that has only 3 wwtps selected, because this is very improbable. The only way I could manage this was by letting the
+    #algorithm test an initial population that I build manually in a text file. More exploration is needed to let the optimiser know that the
+    #variables are not binary but integers that can take the value of the indexes of the locations, and to select n integres out of 33.
+
     def __init__(self, n_vars: int, n_objectives: int, script_name: str):
-        super().__init__(n_vars, n_objectives)
+        # n_wwtps = 3
+        super().__init__(n_vars, n_objectives)  #This super points to the platypus problem - here
 
         # Read in graph
         self._graph_base = create_graph()

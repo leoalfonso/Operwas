@@ -47,6 +47,9 @@ EXP_PUMPING_LENGTH_PUMP_FILE_PATH = os.path.join(
 EXP_PUMPING_LENGTH_GRAV_FILE_PATH = os.path.join(
     EXP_PUMPING_RESULTS_DIR_PATH, "pumping_length_grav.npy")
 
+# Hossein's thesis: costs of sewer networkS for each possible combination of WWTPs, made with Swimm
+NETWORK_COST_SWIMM_FILE_PATH = os.path.join(ROOT_DIR, "swimm_networks_costs") #, "1.txt")
+
 # Pumping feasibility
 PUMPING_HEIGHT_MIN = 0.0
 PUMPING_HEIGHT_MAX = 40.0
@@ -66,8 +69,8 @@ WEIGHT_NODE_TYPE_WWPS = 1.0
 MUTATION_PROBABILITY = 0.1
 CROSSOVER_PROBABILITY = 0.2
 
-OPT_NUM_GENERATIONS = 5
-OPT_POPULATION_SIZE = 10
+OPT_NUM_GENERATIONS = 20
+OPT_POPULATION_SIZE = 100
 
 RUN_RESULTS_STORE_RESULTS_SOLUTIONS_INTERVAL: Optional[int] = 1
 RUN_RESULTS_STORE_RESULTS_TOTAL_INTERVAL: Optional[int] = 1
