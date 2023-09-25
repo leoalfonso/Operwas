@@ -1,5 +1,5 @@
 # This does exactly the same as operwas, but using the database produced with __init__.py in scr/faster/experiments
-# so it is faster. This file considers decision variables equal to the amount of wwtp candidates (33)
+# so it is faster.
 
 import pathlib
 import ast
@@ -8,6 +8,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from platypus import NSGAII, EpsMOEA, Problem, Solution, Subset
+from platypus import Integer
 
 from src.faster import config
 from src.faster.accumulate import (calc_networklength_accum_nodes,
@@ -20,18 +21,22 @@ from src.faster.optimization.base import OperwaFastBase, store_results_archive
 
 SCRIPT_NAME = pathlib.Path(__file__).stem
 
-THERE_IS_INITIAL_SEED = False    # If turned to True, make sure the required files exist, and stop before NSGA2 runs.
+THERE_IS_INITIAL_SEED = False
 
-class OperwaFast(OperwaFastBase):  # This is a Platypus problem
+# The optimisation problem in no_pumping.py is set up as one with 33 decision variables that are binary.
+# This script is to allow the user to select n WWTPs so that the problem has n decision variables that correspond to
+# n indexes of the 33 candidates. The optimization problem has, therefore, n integer decision variables
+
+class OperwaFastN(OperwaFastBase):
     def __init__(self):
         n_objectives = 2
-        n_vars = create_graph().number_of_nodes()
-        #n_candidates = create_graph().number_of_nodes()
+        n_vars = 5  # Set the number of decision variables (number of WWTPs to be located)
 
-        super().__init__(n_vars, n_objectives, SCRIPT_NAME)  #This supoer points to OperwasFastBase class in base.py
+        super().__init__(n_vars, n_objectives, SCRIPT_NAME)
 
         for i in range(len(self.types)):
-            self.types[i] = Subset([NodeType.NOTHING, NodeType.WWTP], 1)
+            # Use Integer type for the n_vars decision variables
+            self.types[i] = Integer(0, 32)  # Assuming indexes can range from 0 to 32
 
         self.directions[0] = Problem.MAXIMIZE
         self.directions[1] = Problem.MAXIMIZE
@@ -39,14 +44,14 @@ class OperwaFast(OperwaFastBase):  # This is a Platypus problem
         self._idx_evaluation = -1
 
     def evaluate(self, solution: Solution):
-
         self._idx_evaluation += 1
         if self._idx_evaluation % 100 == 0:
             print(f"Evaluation #{self._idx_evaluation}")
 
-        node_types = [vs[0] for vs in solution.variables]
+        # Extract the integer decision variables (indexes)
+        indexes = solution.variables
 
-        data_dict = prepare_optimization_data(node_types, self._graph, self._data_dict_base)
+        data_dict = prepare_optimization_data_n(indexes, self._graph, self._data_dict_base)
 
         feasibility_check(data_dict)
 
@@ -71,7 +76,7 @@ class OperwaFast(OperwaFastBase):  # This is a Platypus problem
         solution_store = None
         if not config.RUN_RESULTS_STORE_RESULTS_SOLUTIONS_INTERVAL is None:
             if self._idx_evaluation % config.RUN_RESULTS_STORE_RESULTS_SOLUTIONS_INTERVAL == 0:
-                solution_store = np.array(node_types)
+                solution_store = np.array(indexes)
 
         if not results_nodes is None:
             results_nodes["idx_evaluation"] = np.full(
@@ -82,17 +87,32 @@ class OperwaFast(OperwaFastBase):  # This is a Platypus problem
         self.store_results(solution_store, results_total, results_nodes)
 
 
-def prepare_optimization_data(node_types: list[NodeType], graph: nx.DiGraph, data_dict_base: dict[str, np.ndarray]) -> \
-dict[str, np.ndarray]:
+def prepare_optimization_data_n(node_indexes: list[int], graph: nx.DiGraph, data_dict_base: dict[str, np.ndarray]) -> \
+        dict[str, np.ndarray]:
     """
     Note: mutates `graph`.
     """
     data_dict = {key: val.copy() for key, val in data_dict_base.items()}
 
-    for idx_node, node_type in zip(graph.nodes(), node_types):
+    # Create a list to store NodeType enum values for all nodes
+    node_type_list = [NodeType.NOTHING] * len(graph.nodes)
+
+    # Assign NodeType.WWTP to selected indexes
+    for node_index in node_indexes:
+        node_type_list[node_index-1] = NodeType.WWTP
+
+    # Create a list of individual NodeType values
+    node_type_values = [node_type for node_type in node_type_list]
+    # Convert the node_type_list to a flat numpy array of integer values
+    data_dict["node_type"] = np.array([node_type.value for node_type in node_type_list], dtype=object)
+    # Convert the node_type_list to a numpy array
+    data_dict["node_type"] = np.array(node_type_list, dtype=NodeType)
+
+    for idx_node, node_type_value in enumerate(data_dict["node_type"]):
         node_data = graph.nodes[idx_node]
+        node_type = NodeType(node_type_value)
         node_data["node_type"] = node_type
-        data_dict["node_type"][idx_node] = node_type
+
         if node_type == NodeType.NOTHING:
             data_dict["activated"][idx_node] = False
             data_dict["connects_to"][idx_node] = -2
@@ -121,52 +141,50 @@ dict[str, np.ndarray]:
 
     return data_dict
 
-
-# --------------------------------- LEO--------------------
-
-
-def my_logging(algorithm):
+def my_logging_n(algorithm):
     print(f"Generation: {algorithm.nfe}")
     for solution in algorithm.population:
         print(f"Variable values: {solution.variables[0]}")
     print("--------------")
 
-
-# --------------------------------- LEO
-
-
-def run_operwa_fast(n_generations: int, population_size: int):
+def run_operwa_fast_n(n_generations: int, population_size: int):
     n_runs = n_generations * population_size
     assert n_runs > 0, "Number of runs should be larger than zero."
 
-    problem = OperwaFast()
+    problem = OperwaFastN()
 
-    # Use seed to help the algorithm
-
-    # Create a mapping dictionary for numeric values to NodeType
-    value_to_node_type = {
-        0: NodeType.NOTHING,
-        1: NodeType.WWTP,
-        # Add more mappings as needed
-    }
     if THERE_IS_INITIAL_SEED:
+    # - ------------------------ Script to use initial solutions(seeds) ------------------------------
+    # if there is a fileini_n.txt with initial solutions in the form (number of columns is the number of WWTPs
+        # and the values are the indexes of the WWTPs)
+        # 1,2,3
+        # 1,2,4
+        # 1,2,5
+        # 1,2,6, etc.
 
-    # THIS WORKS WELL ***********************
+        # Create a mapping dictionary for numeric values to NodeType
+        value_to_node_type = {
+            0: NodeType.NOTHING,
+            1: NodeType.WWTP,
+            # Add more mappings as needed
+        }
+
         # Read the solutions from the text file
-        with open(r'D:\OP_pycharm\Operwas_pump\inputs\combinations2.txt', "r") as file:
+        with open(r'D:\OP_pycharm\Operwas_pump\inputs\ini_n.txt', "r") as file:
             solution_strings = file.readlines()
 
         # Define a function to parse a solution string and create a solution
+
         def parse_solution_string(solution_string):
             initial_values = ast.literal_eval(solution_string)  # Safely evaluate the string to get the list of values
-            initial_solution = Solution(problem)
+            if len(initial_values) != problem.nvars:
+                raise Exception("The seed file contains solutions for " + str(len(initial_values)) + " WWTPs, but n_vars was set to n_vars = " + str(problem.nvars) + ". Both should be the same, please check.")
 
-            # Map numeric values to NodeType using the mapping dictionary and wrap each value in a list
-            initial_values = [[value_to_node_type[value]] for value in initial_values]
+            initial_solution_n = Solution(problem)
 
-            initial_solution.variables[:] = initial_values
-            problem.evaluate(initial_solution)
-            return initial_solution
+            initial_solution_n.variables[:] = initial_values
+            problem.evaluate(initial_solution_n)
+            return initial_solution_n
 
         # Create a list of initial solutions by parsing the solution strings
         initial_solutions = [parse_solution_string(solution_str) for solution_str in solution_strings]
@@ -184,14 +202,11 @@ def run_operwa_fast(n_generations: int, population_size: int):
                 file.write(f"{result[0]}, {result[1]}\n")
 
         algorithm = NSGAII(problem, population=[initial_solutions], population_size=population_size, archive=[])
-    # THIS WORKS WELL ***********************
-    else:
+    # - ------------------------ end script to use initial solutions(seeds) ------------------------------
+    else:  # , so, if THERE_IS_INITIAL_SEED is False
         algorithm = NSGAII(problem, population_size=population_size, archive=[])
 
-    #    algorithm.logger.add_observer(my_logging) #------------LEO, to get intermediate opt values
-
     algorithm.run(n_runs)  # , callback=my_logging)  #
-
     store_results_archive(algorithm)
 
     # Plot data in graph
@@ -216,6 +231,6 @@ def run_operwa_fast(n_generations: int, population_size: int):
 
 if __name__ == "__main__":
     for _ in range(1):
-        run_operwa_fast(n_generations=config.OPT_NUM_GENERATIONS,
+        run_operwa_fast_n(n_generations=config.OPT_NUM_GENERATIONS,
                         population_size=config.OPT_POPULATION_SIZE)
 print("Stop")

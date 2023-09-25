@@ -9,9 +9,9 @@ from subprocess import run
 
 import numpy as np
 import pandas as pd
-import pygeoprocessing.routing
+#import pygeoprocessing.routing
 import rtree
-from osgeo import gdal, gdalconst, ogr, osr
+#from osgeo import gdal, gdalconst, ogr, osr
 
 import src.user_inputs as usin
 from src.faster.custom_typing import Connection, Coordinate

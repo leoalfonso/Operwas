@@ -2,7 +2,6 @@ import logging
 from typing import Callable, Optional
 
 import numpy as np
-import pandas as pd
 
 import src.user_inputs as usin
 from src.faster.custom_typing import DataInterpolator, Scalar
@@ -10,8 +9,10 @@ from src.faster.node_types import NodeType
 from src.faster.pumping_stuff import (calc_wwps_capex,
                                       calc_wwps_opex_and_maint_year)
 from src.faster.reuse_types import ReuseType
+from src.faster import config
 
 logging.basicConfig()
+
 
 ################################################
 ## Description of functions in AOKP algorithm ##
@@ -128,13 +129,13 @@ def get_land_cost_by_wwtp(land_cost_per_m2: np.ndarray, flow_wwtp: np.ndarray, t
     # TODO: could just assume that when there is reuse the NodeType is automatically WWTP
     idx_agricultural = type_reuse == ReuseType.AGRICULTURAL
     land_cost[idx_agricultural] = usin.area_usage_cas * \
-        flow_wwtp[idx_agricultural] * land_cost_per_m2[idx_agricultural]
+                                  flow_wwtp[idx_agricultural] * land_cost_per_m2[idx_agricultural]
 
     # Urban
     # TODO: could just assume that when there is reuse the NodeType is automatically WWTP
     idx_urban = type_reuse == ReuseType.URBAN
     land_cost[idx_urban] = usin.area_usage_mbr * \
-        flow_wwtp[idx_urban] * land_cost_per_m2[idx_urban]
+                           flow_wwtp[idx_urban] * land_cost_per_m2[idx_urban]
 
     return land_cost
 
@@ -172,7 +173,7 @@ def calculate_wwps_costs(flow_wwps_m3pd: np.ndarray, type_node: np.ndarray,
                          pipe_length_pump: np.ndarray, pipe_length_grav: np.ndarray,
                          pump_height: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     secs_per_day = 24 * 3600
-    flow_wwps_m3ps = flow_wwps_m3pd * (1/secs_per_day)
+    flow_wwps_m3ps = flow_wwps_m3pd * (1 / secs_per_day)
 
     idx_pump_station = type_node == NodeType.WWPS
     # Construction investment costs
@@ -204,8 +205,8 @@ def wwtp_costs(flow_wwtp: np.ndarray, known_flow_1, known_flow_2: float, known_i
         Inv_1=known_inv_1, Inv_2=known_inv_2, Q1=known_flow_1, Q2=known_flow_2)
 
     # Cost to capacity for O&M
-    oem_costs = ((flow_wwtp * (1/known_flow_1)) ** (sc_oem)) * known_oem_1
-    investment_costs = ((flow_wwtp * (1/known_flow_1)) ** (sc_inv)) * known_inv_1
+    oem_costs = ((flow_wwtp * (1 / known_flow_1)) ** (sc_oem)) * known_oem_1
+    investment_costs = ((flow_wwtp * (1 / known_flow_1)) ** (sc_inv)) * known_inv_1
     wwtp_total_cost = investment_costs + oem_costs
     return wwtp_total_cost
 
@@ -251,6 +252,54 @@ def calculate_reuse_network_costs(pipe_length_reuse: np.ndarray, types_reuse: np
     return reuse_network_costs_new
 
 
+# ***************************************************************************************************************
+# *****************HOSSEIN'S COSTS OF NETWORKS DESIGNED USING SWIMM for three WWTPs*******************************
+# ***************************************************************************************************************
+# # todo: read the file outside this function. Instead, use a variable with the content of the file as an argument.
+# def network_cost_swimm(cost_path, WWTP1, WWTP2, WWTP3):
+#     # Convert WWTP1, WWTP2, WWTP3 to numbers and sort them
+#     sorted_costs = sorted([int(WWTP1), int(WWTP2), int(WWTP3)])
+#     # Create the comb variable as a string
+#
+#     comb = f"{sorted_costs[0]},{sorted_costs[1]},{sorted_costs[2]}"
+#     cost_file = open(cost_path, "r")
+#
+#     for line in cost_file:
+#         if line.startswith(comb):
+#             cost = line.split(',')[3]
+#             cost_file.close()
+#             return int(cost)
+#     cost_file.close()
+#     return
+
+def network_cost_swimm(files_directory, WWTP_IDs):
+    # Convert WWTP IDs to numbers and sort them
+
+    WWTP_IDs = [int(WWTP_ID) for WWTP_ID in WWTP_IDs]
+    WWTP_IDs.sort()
+
+    # Create the comb variable as a string
+    comb = ""
+
+    for WWTP_ID in WWTP_IDs:
+        comb += f"{WWTP_ID},"
+
+    file_path = files_directory + '\\' + str(len(WWTP_IDs)) + '.txt'
+    cost_file = open(file_path, "r")
+
+    for line in cost_file:
+        if line.startswith(comb):
+            cost = line.split(',')[len(WWTP_IDs)]
+            cost_file.close()
+            return cost
+
+    cost_file.close()
+    return 0
+
+# ***************************************************************************************************************
+# *****************HOSSEIN'S COSTS OF NETWORKS DESIGNED USING SWIMM for three WWTPs*******************************
+# ***************************************************************************************************************
+
 def calculate_flows_reuse(area_reuse: np.ndarray, flow_reuse: np.ndarray,
                           types_reuse: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     # TODO: treatment types should be a numpy array already
@@ -262,7 +311,7 @@ def calculate_flows_reuse(area_reuse: np.ndarray, flow_reuse: np.ndarray,
     idx_agricultural = types_reuse == ReuseType.AGRICULTURAL
     flow_agricultural[idx_agricultural] = flow_reuse[idx_agricultural]
     flow_per_area_agricultural[idx_agricultural] = flow_reuse[idx_agricultural] / \
-        area_reuse[idx_agricultural]
+                                                   area_reuse[idx_agricultural]
 
     # Urban
     flow_urban = np.zeros(flow_reuse.shape)
@@ -304,7 +353,8 @@ def benefits_freshwater_with_reuse(population: np.ndarray, flow_urban_reuse: Opt
     return benefit_freshwater_per_subcatch
 
 
-def benefits_reuse_selling(flow_agriculture_reuse: np.ndarray, flow_urban_reuse: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def benefits_reuse_selling(flow_agriculture_reuse: np.ndarray, flow_urban_reuse: np.ndarray) -> tuple[
+    np.ndarray, np.ndarray]:
     # TODO: cast these lists to array in the input script
     tariff_reclaimed_arr = np.array(usin.tariff_reclaimed)  # (n_towns,)
     collection_efficiency_arr = np.array(usin.collection_efficiency)  # (n_towns,)
@@ -327,7 +377,7 @@ def calculate_energy_savings(idx_towns: np.ndarray, flow_reuse: np.ndarray) -> n
 
 def calculate_environmental_savings(flow_reuse: np.ndarray, flow_discharged: np.ndarray) -> np.ndarray:
     environmental_savings: np.ndarray = (
-        flow_reuse - flow_discharged) * usin.ww_treatment_after_discharge * 365
+                                                flow_reuse - flow_discharged) * usin.ww_treatment_after_discharge * 365
     return environmental_savings
 
 
@@ -347,8 +397,8 @@ def costs_freshwater_without_reuse_factory() -> Callable[[np.ndarray, Optional[n
     c_dist_energy_arr = np.array(usin.c_dist_energy)  # (n_towns,)
     c_dist_adm_arr = np.array(usin.c_dist_adm)  # (n_towns,)
 
-    losses_distribution_arr_inv = 1/(1 - losses_distribution_arr)
-    losses_transmission_arr_inv = 1/(1 - losses_transmission_arr)
+    losses_distribution_arr_inv = 1 / (1 - losses_distribution_arr)
+    losses_transmission_arr_inv = 1 / (1 - losses_transmission_arr)
 
     c_dist_cost_arr = c_dist_staff_arr + c_dist_energy_arr + c_dist_adm_arr
 
@@ -382,7 +432,7 @@ def costs_freshwater_without_reuse_factory() -> Callable[[np.ndarray, Optional[n
 
         # Costs: total
         total_costs_water_per_subcatch_without_reuse: np.ndarray = total_costs_prod + \
-            total_costs_tran + total_costs_dist
+                                                                   total_costs_tran + total_costs_dist
 
         return total_costs_water_per_subcatch_without_reuse
 
@@ -401,10 +451,10 @@ def calc_pumping_reuse_costs(radius_buffer: np.ndarray, flow_wwtp: np.ndarray, t
             flow = flow_wwtp[i] / 24
             velocity = (flow / (np.pi * (usin.diameter ** 2) / 4)) / 3600
             linear_headlosses = usin.f * (distance / usin.diameter) * \
-                ((velocity ** 2) / (2 * 9.81))
+                                ((velocity ** 2) / (2 * 9.81))
             local_losses = usin.local_losses_coef * distance
             head_to_be_saved = delta_z + usin.h_suction + usin.h_outlet + \
-                usin.h_reservoir + linear_headlosses + local_losses
+                               usin.h_reservoir + linear_headlosses + local_losses
             hydraulic_power = (flow * usin.density * 9.81 *
                                head_to_be_saved) / (3.6 * (10 ** 6))  # KW
             required_energy = usin.pump_operation_time * hydraulic_power  # kwh
@@ -419,7 +469,6 @@ def calc_pumping_reuse_costs(radius_buffer: np.ndarray, flow_wwtp: np.ndarray, t
 
 
 def onsite_treat_costs(total_pop, cluster_pop):
-
     # assumptions
     people_by_unit = 6.2 * 4  # person/septictank 4 people/building
     empty_frequency_year = 2  # times/year/septictank
@@ -427,7 +476,7 @@ def onsite_treat_costs(total_pop, cluster_pop):
     construction_costs = 8500  # ILS/unit
 
     onsite_pop = total_pop - cluster_pop
-    num_units = onsite_pop/people_by_unit
+    num_units = onsite_pop / people_by_unit
     operation_costs_year = empty_frequency_year * empty_costs * num_units
     investment_costs = construction_costs * num_units
 
@@ -435,7 +484,8 @@ def onsite_treat_costs(total_pop, cluster_pop):
 
 
 def calculate_reuse(idx_nodes: np.ndarray, flows_available: np.ndarray,
-                    interpolators: dict[int, dict[str, DataInterpolator]]) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                    interpolators: dict[int, dict[str, DataInterpolator]]) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     radiuses_reuse = np.zeros(flows_available.shape)
     flows_applied_reuse = np.zeros(flows_available.shape)
     types_reuse = np.full(idx_nodes.shape, ReuseType.NO_REUSE)
@@ -454,7 +504,8 @@ def calculate_reuse(idx_nodes: np.ndarray, flows_available: np.ndarray,
     return radiuses_reuse, flows_applied_reuse, types_reuse, areas_reuse
 
 
-def get_reuse_from_interpolator(flow_available: float, interpolators: dict[str, DataInterpolator]) -> tuple[float, ReuseType, float]:
+def get_reuse_from_interpolator(flow_available: float, interpolators: dict[str, DataInterpolator]) -> tuple[
+    float, ReuseType, float]:
     aap = {
         ReuseType.AGRICULTURAL: usin.irr_oper_agr,
         ReuseType.URBAN: usin.irr_oper_urb
@@ -482,7 +533,8 @@ def get_reuse_network_length(idx_nodes: np.ndarray, radiuses: np.ndarray,
     return network_length_reuse
 
 
-def get_pop_per_town_per_buffer(idx_nodes: np.ndarray, radiuses: np.ndarray, interpolators: dict[int, dict[str, DataInterpolator]]) -> np.ndarray:
+def get_pop_per_town_per_buffer(idx_nodes: np.ndarray, radiuses: np.ndarray,
+                                interpolators: dict[int, dict[str, DataInterpolator]]) -> np.ndarray:
     pop_per_town_per_buffer = np.full((4, idx_nodes.shape[0]), np.nan)
     for i_town in range(pop_per_town_per_buffer.shape[0]):
         for i_buffer, (i_node, radius_buffer) in enumerate(zip(idx_nodes, radiuses)):
@@ -497,7 +549,7 @@ def get_pop_per_town_per_subcatchment(data_dict: dict[str, np.ndarray]) -> np.nd
     pop_per_town_per_subcatchment = np.zeros((n_towns, data_dict["idx_node"].shape[0]))
     for i_town in range(n_towns):
         pop_per_town_per_subcatchment[i_town,
-                                      :] = data_dict[f"population_served__town_{i_town}"]
+        :] = data_dict[f"population_served__town_{i_town}"]
     return pop_per_town_per_subcatchment
 
 
@@ -508,7 +560,9 @@ def calculate_reuse_reservoir_costs(flow: np.ndarray, type_reuse: np.ndarray) ->
     # Agricultural + urban
     idx_agri_or_urb = (type_reuse == ReuseType.AGRICULTURAL) | (type_reuse == ReuseType.URBAN)
     reuse_reservoir_costs[idx_agri_or_urb] = (
-        (flow[idx_agri_or_urb] * (1.25 / usin.known_reservoir_volume_1)) ** (sc_reservoir)) * usin.known_inv_cost_reservoir_1
+                                                     (flow[idx_agri_or_urb] * (
+                                                             1.25 / usin.known_reservoir_volume_1)) ** (
+                                                         sc_reservoir)) * usin.known_inv_cost_reservoir_1
     return reuse_reservoir_costs
 
 
@@ -521,11 +575,12 @@ def calculate_flow_discharged(flow_available_reuse: np.ndarray, flow_applied_reu
     return flow_discharged
 
 
-def calculate_decentralization_degree(flow_wwtp: np.ndarray, pop_per_subcatchment_wwtp: np.ndarray) -> tuple[float, float]:
+def calculate_decentralization_degree(flow_wwtp: np.ndarray, pop_per_subcatchment_wwtp: np.ndarray) -> tuple[
+    float, float]:
     # Select only WWTP data
     # Carry on
     total_flow = flow_wwtp.sum()
-    numbers_households = pop_per_subcatchment_wwtp * (1/usin.inhabit_per_household)
+    numbers_households = pop_per_subcatchment_wwtp * (1 / usin.inhabit_per_household)
     total_households = numbers_households.sum()
     sum_flow_per_hh = (flow_wwtp / numbers_households).sum()
     dec_degree_eggiman = (total_flow - sum_flow_per_hh) / total_flow
@@ -534,7 +589,8 @@ def calculate_decentralization_degree(flow_wwtp: np.ndarray, pop_per_subcatchmen
     return dec_degree_eggiman, dec_degree_huang
 
 
-def split_population_wwtp_wwps(pop_per_town_per_subcatchment: np.ndarray, node_types: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def split_population_wwtp_wwps(pop_per_town_per_subcatchment: np.ndarray, node_types: np.ndarray) -> tuple[
+    np.ndarray, np.ndarray]:
     pop_per_town_per_subcatchment_wwtp = np.zeros(pop_per_town_per_subcatchment.shape)
     idx_wwtp = node_types == NodeType.WWTP
     pop_per_town_per_subcatchment_wwtp[:, idx_wwtp] = pop_per_town_per_subcatchment[:, idx_wwtp]
@@ -550,9 +606,24 @@ def Join_Calcul(
         store_node_results: bool = True,
         store_total_results: bool = True
 ) -> tuple[float, float, Optional[dict[str, Scalar]], Optional[dict[str, np.ndarray]]]:
-
-    ww_pipe_inv_costs = np.array(
+    ww_pipe_inv_costs_old = np.array(
         [PIPELINE_REUSE_INV_COST_CALCULATOR(pipe_length) for pipe_length in data_dict["network_length"]])
+
+    # ***** HOSSEIN CODE network  cost swimm *****
+#     ww_pipe_inv_costs = int(network_cost_swimm(
+#         config.NETWORK_COST_SWIMM_FILE_PATH,
+#         [
+#         data_dict['idx_node'][0],
+# #        data_dict['idx_node'][1],
+# #        data_dict['idx_node'][2],
+# #        data_dict['idx_node'][3]
+#         ]
+#     ))
+
+#    print("Estimated Maria (+" + str(len(data_dict['idx_node'])) + " WWTPs): " + str(sum(ww_pipe_inv_costs_old)) +
+#          ". Estimated Hossein: (4 WWTPs):" + str(ww_pipe_inv_costs))
+
+    # *******************************************
 
     pop_per_town_per_subcatchment = get_pop_per_town_per_subcatchment(data_dict)
 
@@ -656,7 +727,7 @@ def Join_Calcul(
                                                                 n=usin.n, c_op_year=benefit_ww_fees.sum())
 
     benefits_reclaimed_water_management = present_value(DR=usin.DR, n=usin.n, c_op_year=benefits_agriculture.sum()) + \
-        present_value(DR=usin.DR, n=usin.n, c_op_year=benefits_urban.sum())
+                                          present_value(DR=usin.DR, n=usin.n, c_op_year=benefits_urban.sum())
     benefits_freshwater_management = present_value(
         DR=usin.DR, n=usin.n, c_op_year=benefit_freshwater_per_subcatch.sum())
     benefits_energy_savings = present_value(
@@ -667,15 +738,15 @@ def Join_Calcul(
     total_benefits_onsite = benefit_connection_onsite + pv_fees_onsite
 
     total_benefits = total_benefit_ww + benefits_reclaimed_water_management + benefits_freshwater_management + benefits_energy_savings + benefits_env_savings \
-        + total_benefits_onsite
+                     + total_benefits_onsite
 
     # Total costs
 
-    total_costs_ww = ww_pipe_inv_costs.sum() + treatment_costs.sum() + land_cost_by_wwtp.sum()
+    total_costs_ww = ww_pipe_inv_costs_old.sum() + treatment_costs.sum() + land_cost_by_wwtp.sum() # ww_pipe_inv_costs_old is with Maria's method
     total_costs_wwps = total_costs_wwps.sum() + land_costs_wwps.sum()
 
     total_costs_reclaimed_ww = reuse_reservoir_costs.sum() + reuse_network_costs.sum() + \
-        present_value(DR=usin.DR, n=usin.n, c_op_year=costs_reuse_pumping.sum())
+                               present_value(DR=usin.DR, n=usin.n, c_op_year=costs_reuse_pumping.sum())
 
     total_costs_freshwater_mngt = present_value(
         DR=usin.DR, n=usin.n, c_op_year=total_costs_water_per_buffer.sum())
@@ -683,7 +754,7 @@ def Join_Calcul(
     total_costs_onsite = onsite_inv_costs + pv_oem_onsite
 
     total_costs = total_costs_ww + total_costs_reclaimed_ww + total_costs_freshwater_mngt \
-        + total_costs_onsite + total_costs_wwps
+                  + total_costs_onsite + total_costs_wwps
 
     # Calculation of coverage with cluster level sanitation
     coverage_region = coverage_check(pop_per_subcatchment_wwtp, usin.total_population)
@@ -785,4 +856,4 @@ def Join_Calcul(
     else:
         results_total = None
 
-    return benefits_over_costs,  coverage_catchment, results_total, results_nodes
+    return benefits_over_costs, coverage_catchment, results_total, results_nodes
