@@ -11,6 +11,9 @@ from src.faster.pumping_stuff import (calc_wwps_capex,
 from src.faster.reuse_types import ReuseType
 from src.faster import config
 
+from src.faster.optimization.Odur.operwa_TT_module import runIntegration, \
+    runTreatmentModuleIntegration, toV1CostArray, normalizeV2ZeroFlows  # From Gerald Odur
+
 logging.basicConfig()
 
 
@@ -151,6 +154,15 @@ def calculate_land_cost_wwps(land_cost_per_m2: np.ndarray) -> np.ndarray:
 
 
 def calculate_wwtp_costs(flow_wwtp: np.ndarray, type_reuse: np.ndarray) -> np.ndarray:
+
+    """
+    This function runs the original treatment_costs of Maria W, which is based on CAS for agricultural irrigation use,
+    and MBR for urban irrigation or No-reuse
+
+    If costs are to be calculated based on technology selection criteria for a given reuse and flow/person equivalent,
+    then use the version of Odur, implemented in the function "calculate_wwtp_costs_trains"
+    """
+
     treatment_costs = np.zeros(flow_wwtp.shape)
 
     # Agricultural
@@ -167,6 +179,10 @@ def calculate_wwtp_costs(flow_wwtp: np.ndarray, type_reuse: np.ndarray) -> np.nd
                                             usin.DR, usin.n)
 
     return treatment_costs
+
+
+def calculate_wwtp_costs_trains():
+    pass  # todo: implement here Gerald Odur's code: runIntegration(flow_wwtp, land_cost_in_wwtp_location)
 
 
 def calculate_wwps_costs(flow_wwps_m3pd: np.ndarray, type_node: np.ndarray,
@@ -295,6 +311,7 @@ def network_cost_swimm(files_directory, WWTP_IDs):
 
     cost_file.close()
     return 0
+
 
 # ***************************************************************************************************************
 # *****************HOSSEIN'S COSTS OF NETWORKS DESIGNED USING SWIMM for three WWTPs*******************************
@@ -610,18 +627,18 @@ def Join_Calcul(
         [PIPELINE_REUSE_INV_COST_CALCULATOR(pipe_length) for pipe_length in data_dict["network_length"]])
 
     # ***** HOSSEIN CODE network  cost swimm *****
-#     ww_pipe_inv_costs = int(network_cost_swimm(
-#         config.NETWORK_COST_SWIMM_FILE_PATH,
-#         [
-#         data_dict['idx_node'][0],
-# #        data_dict['idx_node'][1],
-# #        data_dict['idx_node'][2],
-# #        data_dict['idx_node'][3]
-#         ]
-#     ))
+    ww_pipe_inv_costs = int(network_cost_swimm(
+        config.NETWORK_COST_SWIMM_FILE_PATH,
+        [
+            data_dict['idx_node'][0]
+            #        data_dict['idx_node'][1],
+            #        data_dict['idx_node'][2],
+            #        data_dict['idx_node'][3]
+        ]
+    ))
 
-#    print("Estimated Maria (+" + str(len(data_dict['idx_node'])) + " WWTPs): " + str(sum(ww_pipe_inv_costs_old)) +
-#          ". Estimated Hossein: (4 WWTPs):" + str(ww_pipe_inv_costs))
+    #    print("Estimated Maria (+" + str(len(data_dict['idx_node'])) + " WWTPs): " + str(sum(ww_pipe_inv_costs_old)) +
+    #          ". Estimated Hossein: (4 WWTPs):" + str(ww_pipe_inv_costs))
 
     # *******************************************
 
@@ -742,7 +759,7 @@ def Join_Calcul(
 
     # Total costs
 
-    total_costs_ww = ww_pipe_inv_costs_old.sum() + treatment_costs.sum() + land_cost_by_wwtp.sum() # ww_pipe_inv_costs_old is with Maria's method
+    total_costs_ww = ww_pipe_inv_costs_old.sum() + treatment_costs.sum() + land_cost_by_wwtp.sum()  # ww_pipe_inv_costs_old is with Maria's method
     total_costs_wwps = total_costs_wwps.sum() + land_costs_wwps.sum()
 
     total_costs_reclaimed_ww = reuse_reservoir_costs.sum() + reuse_network_costs.sum() + \

@@ -30,7 +30,7 @@ THERE_IS_INITIAL_SEED = False
 class OperwaFastN(OperwaFastBase):
     def __init__(self):
         n_objectives = 2
-        n_vars = 5  # Set the number of decision variables (number of WWTPs to be located)
+        n_vars = 4  # Set the number of decision variables (number of WWTPs to be located)
 
         super().__init__(n_vars, n_objectives, SCRIPT_NAME)
 
