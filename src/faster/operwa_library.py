@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Optional
+from typing import Callable, Optional, List
 
 import numpy as np
 
@@ -181,9 +181,16 @@ def calculate_wwtp_costs(flow_wwtp: np.ndarray, type_reuse: np.ndarray) -> np.nd
     return treatment_costs
 
 
-def calculate_wwtp_costs_trains():
-    pass  # todo: implement here Gerald Odur's code: runIntegration(flow_wwtp, land_cost_in_wwtp_location)
-
+def calculate_wwtp_costs_trains(flow_wwtp: np.ndarray, land_cost_in_wwtp_location:List[float],type_reuse: np.ndarray):
+    # todo: implement here Gerald Odur's code: runIntegration(flow_wwtp, land_cost_in_wwtp_location)
+    # todo: I need to test these costs for compatibility with Maria A's code
+    runIntegration(flow_wwtp, land_cost_in_wwtp_location)
+    treatment_train_data_v2 = runTreatmentModuleIntegration(
+        flow_wwtp, type_reuse
+    )
+    treatment_costs = toV1CostArray(treatment_train_data_v2, ["capital_cost", "operational_cost", "energy_cost"])
+    #land_cost_by_wwtp = toV1CostArray(treatment_train_data_v2, ["land_requirement_cost"])
+    return treatment_costs
 
 def calculate_wwps_costs(flow_wwps_m3pd: np.ndarray, type_node: np.ndarray,
                          pipe_length_pump: np.ndarray, pipe_length_grav: np.ndarray,
