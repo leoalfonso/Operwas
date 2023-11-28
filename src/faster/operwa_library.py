@@ -24,15 +24,18 @@ logging.basicConfig()
 
 def present_value(DR, n, c_op_year):
     """
-    This function calculates the present value cost for determined number of operation years.
+        Calculate the present value cost for a determined number of operation years.
 
-    :param: DR = Discount rate ()
-            n = expected operated life (years)
-            cost_year = cost expended per year for operation (ILS/year)
+        Args:
+            DR (float): Discount rate.
+            n (int): Expected operating life in years.
+            cost_year (float): Cost expended per year for operation in ILS/year.
 
-    :return: cost_total (ILS)
-    """
+        Returns:
+            float: Total present value cost in ILS.
+        """
     c_op_total = c_op_year * (1 - (1 + DR) ** (-n)) / DR  # [ILS/year]
+
     return c_op_total
 
 
