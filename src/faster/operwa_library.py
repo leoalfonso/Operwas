@@ -41,94 +41,122 @@ def present_value(DR, n, c_op_year):
 
 def calculate_scale_factor(Inv_1, Inv_2, Q1, Q2):
     """
-    This function calculates the scale factor for the cost to capacity method.
+    Calculate the scale factor for the cost to capacity method.
 
-    :param: Inv_1 = Factor scale for the Investment Cost - Price 1 [-]
-            Inv_2 = Factor scale for the O&M Cost - Price 2
-            Q1 = Design Capacity of WWTP1 [m3/day]
-            Q2 = Design Capacity of WWTP2 [m3/day]
-    :return: sc_factor
+    Args:
+        Inv_1 (float): Factor scale for the Investment Cost - Price 1 [-].
+        Inv_2 (float): Factor scale for the O&M Cost - Price 2 [-].
+        Q1 (float): Design Capacity of WWTP1 [m³/day].
+        Q2 (float): Design Capacity of WWTP2 [m³/day].
+
+    Returns:
+        float: The calculated scale factor.
+            If the scale factor is greater than 1, implying diseconomies of scale exist
+            and the incremental cost becomes more expensive for every added unit of capacity,
+            it returns a value of 0.7.
+            Otherwise, it returns the calculated scale factor.
     """
 
     sc_factor = (np.log(Inv_2 / Inv_1)) / (np.log(Q2 / Q1))
 
     if sc_factor > 1:
-        # print (sc_factor,'sc_factor is bigger than 1, this means that\
-        # diseconomies of scale exist and the incremental cost becomes more\
-        # expensive for every added unit of capacity. This does not match\
-        # with the literature, where the factor scale for WWTP is smaller\
-        # than 1. For this reason the value is changed to 0.70')
         return 0.7
     else:
-        # print ('sc_factor is ', sc_factor)
         return sc_factor
 
 
 def calculate_flow_based_on_population(pop_per_town_subcatchment: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
-    This function calculates the flow at each treatment plant, considering the designed flow and
+    Calculate the flow at each treatment plant, considering the designed flow and
     population in each subcatchment.
 
-    :param: pop_per_catchment = population in each subcatchment connected to WWTP(inhab)
-            flow_design = flow in m3/d
-    :return: flow_wwtp - Capacity of the WWTP [m3/day]
+    Args:
+        pop_per_town_subcatchment (np.ndarray): Population in each subcatchment connected to WWTP (inhab).
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]:
+            flow_wwtp (np.ndarray): Capacity of the WWTP [m³/day].
+            flow_to_be_treated_peak (np.ndarray): Peak flow to be treated [m³/day].
     """
-    # TODO: cast list to array in input script
+
     water_consumption_per_person_arr = np.array(usin.water_consumption)
     water_consumption_total: np.ndarray = np.einsum("ij,i->j", pop_per_town_subcatchment,
                                                     water_consumption_per_person_arr)
     flow_to_be_treated: np.ndarray = water_consumption_total * (1 - usin.losses_infiltration)
     flow_to_be_treated_peak = flow_to_be_treated * usin.coef_peak
+
     return flow_to_be_treated, flow_to_be_treated_peak
 
 
 def coverage_check(pop_per_subcatchment_wwtp: np.ndarray, real_pop: float) -> float:
     """
-    This function calculates the coverage of the wastewater network in the region.
+    Calculate the coverage of the wastewater network in the region.
 
-    :param: connected_pop = population in the region that is connected to a WWTP(inhab)
-            real_pop = total population given by user
-    :return: coverage = percentage of connected and total population
+    Args:
+        pop_per_subcatchment_wwtp (np.ndarray): Population in the region connected to a WWTP (inhab).
+        real_pop (float): Total population given by the user.
+
+    Returns:
+        float: Percentage of connected population to the total population.
     """
     connected_pop = pop_per_subcatchment_wwtp.sum()
     coverage: float = connected_pop / real_pop
+
     return coverage
 
 
 def calc_benefit_connections(pop_per_catchment: np.ndarray) -> np.ndarray:
     """
-    This function calculates the benefits obtained through the payment of connections fees by
-    the population. This payment is done once in the investment time (normally in the first
-    year), considers the average number of floors per building in the region and the area of
-    buildings per subcatchment.
+    Calculate the benefits obtained through the payment of connection fees by the population.
 
-    :param:
-    :return:
+    This payment is made once in the investment time (usually in the first year) and takes into account
+    the average number of floors per building in the region and the area of buildings per subcatchment.
+
+    Args:
+        pop_per_catchment (np.ndarray): Population in each subcatchment.
+
+    Returns:
+        np.ndarray: Benefits obtained through connection fees paid by the population.
     """
     fee_per_person = usin.fee_connection / usin.inhabit_per_household
     benefit_connection: np.ndarray = pop_per_catchment * fee_per_person
+
     return benefit_connection
 
 
 def calc_benefit_ww_yearly_fees(pop_per_town_per_subcatchment: np.ndarray) -> np.ndarray:
     """
-    This function calculates the benefits obtained through the payment of yearly fees by the
-    population to the water authorities. Present value calculation is made to the investment period
-    time.
+    Calculate the benefits obtained through the payment of yearly fees by the population to the water authorities.
+    The present value calculation is made over the investment period time.
 
-    :param:
-    :return:
+    Args:
+        pop_per_town_per_subcatchment (np.ndarray): Population in each town per subcatchment.
+
+    Returns:
+        np.ndarray: Benefits obtained through yearly fees paid by the population to the water authorities
+                    per subcatchment.
     """
-    # TODO: cast list to arrays in input script
     water_consumtion_arr = np.array(usin.water_consumption)
     fee_sanitary_arr = np.array(usin.fee_sanitary)
     c_arr = water_consumtion_arr * fee_sanitary_arr * 365
     benefit_fees_per_subcatchment: np.ndarray = np.einsum(
         "ij,i->j", pop_per_town_per_subcatchment, c_arr)
+
     return benefit_fees_per_subcatchment
 
 
 def get_land_cost_by_wwtp(land_cost_per_m2: np.ndarray, flow_wwtp: np.ndarray, type_reuse: np.ndarray) -> np.ndarray:
+    """
+        Calculate the land cost based on the wastewater treatment plant (WWTP) characteristics and reuse type.
+
+        Args:
+            land_cost_per_m2 (np.ndarray): Land cost per square meter.
+            flow_wwtp (np.ndarray): Capacity of the WWTP [m³/day].
+            type_reuse (np.ndarray): Array indicating the type of reuse (AGRICULTURAL or URBAN).
+
+        Returns:
+            np.ndarray: Calculated land cost based on the WWTP type and flow.
+        """
     land_cost = np.zeros(land_cost_per_m2.shape)
 
     # Agricultural
@@ -147,23 +175,41 @@ def get_land_cost_by_wwtp(land_cost_per_m2: np.ndarray, flow_wwtp: np.ndarray, t
 
 
 def calculate_land_cost_wwps(land_cost_per_m2: np.ndarray) -> np.ndarray:
+    """
+        Calculate the land cost for Wastewater Pumping Stations (WWPS).
+
+        Args:
+            land_cost_per_m2 (np.ndarray): Land cost per square meter.
+
+        Returns:
+            np.ndarray: Calculated land cost for WWPS.
+        """
     land_cost = np.zeros(land_cost_per_m2.shape)
     # Agricultural
     # idx_wwps = type_node == NodeType.WWPS
     # # TODO: need to have WWPS specific land-cost parameters
     # land_cost[idx_wwps] = usin.area_usage_cas * flow[idx_wwps] * land_cost_per_m2[idx_wwps]
     # Decided that the pumping station size is so small it doesnt have land cost
+
     return land_cost
 
 
 def calculate_wwtp_costs(flow_wwtp: np.ndarray, type_reuse: np.ndarray) -> np.ndarray:
 
     """
-    This function runs the original treatment_costs of Maria W, which is based on CAS for agricultural irrigation use,
-    and MBR for urban irrigation or No-reuse
+    Calculate wastewater treatment plant (WWTP) costs based on technology selection criteria for different reuse types.
 
-    If costs are to be calculated based on technology selection criteria for a given reuse and flow/person equivalent,
-    then use the version of Odur, implemented in the function "calculate_wwtp_costs_trains"
+    This function uses the original treatment_costs of Maria W, which is based on CAS for agricultural irrigation use,
+    and MBR for urban irrigation or No-reuse. If costs are to be calculated based on technology selection criteria for
+    a given reuse and flow/person equivalent, then use the version of Odur, implemented in the function
+    "calculate_wwtp_costs_trains".
+
+    Args:
+        flow_wwtp (np.ndarray): Capacity of the WWTP [m³/day].
+        type_reuse (np.ndarray): Array indicating the type of reuse (AGRICULTURAL or URBAN).
+
+    Returns:
+        np.ndarray: Calculated treatment costs for WWTP based on the specified reuse type.
     """
 
     treatment_costs = np.zeros(flow_wwtp.shape)
@@ -185,6 +231,22 @@ def calculate_wwtp_costs(flow_wwtp: np.ndarray, type_reuse: np.ndarray) -> np.nd
 
 
 def calculate_wwtp_costs_trains(flow_wwtp: np.ndarray, land_cost_in_wwtp_location:List[float],type_reuse: np.ndarray):
+    """
+        Calculate wastewater treatment plant (WWTP) costs based on technology selection criteria for a given reuse and
+        flow/person equivalent and integrating it pumping options analysis.
+
+        This function aims to implement the technology selection code by running integration for the given flow rates of the WWTP and
+        land costs in the WWTP location. It's designed to test these costs for compatibility with the pumping analysis existing code.
+
+        Args:
+            flow_wwtp (np.ndarray): Capacity of the WWTP [m³/day].
+            land_cost_in_wwtp_location (List[float]): Land costs in the WWTP location.
+            type_reuse (np.ndarray): Array indicating the type of reuse.
+
+        Returns:
+            np.ndarray: Calculated treatment costs for WWTP based on the specified flow rates, land costs, and reuse type.
+    """
+
     # todo: implement here Gerald Odur's code: runIntegration(flow_wwtp, land_cost_in_wwtp_location)
     # todo: I need to test these costs for compatibility with Maria A's code
     runIntegration(flow_wwtp, land_cost_in_wwtp_location)
@@ -193,32 +255,71 @@ def calculate_wwtp_costs_trains(flow_wwtp: np.ndarray, land_cost_in_wwtp_locatio
     )
     treatment_costs = toV1CostArray(treatment_train_data_v2, ["capital_cost", "operational_cost", "energy_cost"])
     #land_cost_by_wwtp = toV1CostArray(treatment_train_data_v2, ["land_requirement_cost"])
+
     return treatment_costs
 
-def calculate_wwps_costs(flow_wwps_m3pd: np.ndarray, type_node: np.ndarray,
-                         pipe_length_pump: np.ndarray, pipe_length_grav: np.ndarray,
-                         pump_height: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def calculate_wwps_costs(flow_wwps_m3pd: np.ndarray,
+                         type_node: np.ndarray,
+                         pipe_length_pump: np.ndarray,
+                         pipe_length_grav: np.ndarray,
+                         pump_height: np.ndarray) \
+        -> tuple[np.ndarray, np.ndarray]:
+    """
+        Calculate the costs associated with Wastewater Pumping Stations (WWPS).
+
+        Args:
+            flow_wwps_m3pd (np.ndarray): Flow rate for WWPS [m³/day].
+            type_node (np.ndarray): Array indicating the type of node (WWPS or other).
+            pipe_length_pump (np.ndarray): Pipe length connected to pumps [m].
+            pipe_length_grav (np.ndarray): Pipe length connected to gravity systems [m].
+            pump_height (np.ndarray): Pump height [m].
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]:
+                - Investment costs for WWPS [currency].
+                - Operational lifetime costs for WWPS [currency].
+    """
+
     secs_per_day = 24 * 3600
     flow_wwps_m3ps = flow_wwps_m3pd * (1 / secs_per_day)
 
     idx_pump_station = type_node == NodeType.WWPS
+
     # Construction investment costs
     wwps_costs_investment = np.zeros(flow_wwps_m3ps.shape)
     wwps_costs_investment[idx_pump_station] = calc_wwps_capex(
         flow_wwps_m3ps[idx_pump_station], pipe_length_pump[idx_pump_station], pipe_length_grav[idx_pump_station])
+
     # Operational costs
     wwps_costs_operational_year = np.zeros(flow_wwps_m3ps.shape)
     wwps_costs_operational_year[idx_pump_station] = calc_wwps_opex_and_maint_year(
         flow_wwps_m3ps[idx_pump_station], pipe_length_pump[idx_pump_station], pump_height[idx_pump_station])
     scale_factor_present_value: float = present_value(DR=usin.DR, n=usin.n, c_op_year=1.0)
     wwps_costs_operational_lifetime = scale_factor_present_value * wwps_costs_operational_year
-    # Total costs
-    # wwps_costs_total = wwps_costs_investment + scale_factor_present_value * wwps_costs_operational_year
+
     return wwps_costs_investment, wwps_costs_operational_lifetime
 
 
 def wwtp_costs(flow_wwtp: np.ndarray, known_flow_1, known_flow_2: float, known_inv_1: float,
                known_inv_2: float, known_oem_1: float, known_oem_2: float, DR: float, n: float):
+    """
+        Calculate wastewater treatment plant (WWTP) costs based on known parameters.
+
+        Args:
+            flow_wwtp (np.ndarray): Capacity of the WWTP [m³/day].
+            known_flow_1 (float): Known flow rate 1 [m³/day].
+            known_flow_2 (float): Known flow rate 2 [m³/day].
+            known_inv_1 (float): Known investment cost 1.
+            known_inv_2 (float): Known investment cost 2.
+            known_oem_1 (float): Known O&M cost 1.
+            known_oem_2 (float): Known O&M cost 2.
+            DR (float): Discount rate.
+            n (float): Number of operation years.
+
+        Returns:
+            np.ndarray: Total cost of the WWTP based on the provided parameters.
+    """
+
     # Present value for O&M - costs  1
     pv_oem_1 = present_value(DR=DR, n=n, c_op_year=known_oem_1)
     # Present value for O&M - costs 2
@@ -234,9 +335,10 @@ def wwtp_costs(flow_wwtp: np.ndarray, known_flow_1, known_flow_2: float, known_i
     oem_costs = ((flow_wwtp * (1 / known_flow_1)) ** (sc_oem)) * known_oem_1
     investment_costs = ((flow_wwtp * (1 / known_flow_1)) ** (sc_inv)) * known_inv_1
     wwtp_total_cost = investment_costs + oem_costs
+
     return wwtp_total_cost
 
-
+#REVISE AND IMPROVE DOCSTRINGS
 def calc_pipeline_reuse_inv_cost_factory(pipe_cost: list[float], hRan: list[float]) -> Callable[[float], float]:
     """
     This function calculates the costs of the construction of pipelines.
@@ -265,16 +367,27 @@ def calc_pipeline_reuse_inv_cost_factory(pipe_cost: list[float], hRan: list[floa
 
     return inner
 
-
+# REVISE
 PIPELINE_REUSE_INV_COST_CALCULATOR = calc_pipeline_reuse_inv_cost_factory(
     pipe_cost=usin.Pw, hRan=usin.hRan)
 
 
 def calculate_reuse_network_costs(pipe_length_reuse: np.ndarray, types_reuse: np.ndarray) -> np.ndarray:
+    """
+        Calculate the costs associated with the reuse network based on pipe length and types of reuse.
+
+        Args:
+            pipe_length_reuse (np.ndarray): Length of pipes in the reuse network [m].
+            types_reuse (np.ndarray): Array indicating the type of reuse for each pipe.
+
+        Returns:
+            np.ndarray: Calculated costs for the reuse network based on the provided pipe lengths and reuse types.
+    """
     reuse_network_costs_new = np.zeros(pipe_length_reuse.shape)
     for i, (type_reuse, pipe_length) in enumerate(zip(types_reuse, pipe_length_reuse)):
         if type_reuse in {ReuseType.AGRICULTURAL, ReuseType.URBAN}:
             reuse_network_costs_new[i] = PIPELINE_REUSE_INV_COST_CALCULATOR(pipe_length)
+
     return reuse_network_costs_new
 
 
@@ -298,7 +411,20 @@ def calculate_reuse_network_costs(pipe_length_reuse: np.ndarray, types_reuse: np
 #     cost_file.close()
 #     return
 
+# REVISE: where is this files_directory and what does it contain?
 def network_cost_swimm(files_directory, WWTP_IDs):
+    """
+        Retrieve network cost information based on specified WWTP IDs.
+
+        Args:
+            files_directory (str): Directory containing the cost files.
+            WWTP_IDs (list): List of WWTP IDs.
+
+        Returns:
+            float: Network cost information based on the provided WWTP IDs.
+                   Returns 0 if no matching cost information is found.
+    """
+
     # Convert WWTP IDs to numbers and sort them
 
     WWTP_IDs = [int(WWTP_ID) for WWTP_ID in WWTP_IDs]
@@ -320,6 +446,7 @@ def network_cost_swimm(files_directory, WWTP_IDs):
             return cost
 
     cost_file.close()
+
     return 0
 
 
@@ -329,7 +456,23 @@ def network_cost_swimm(files_directory, WWTP_IDs):
 
 def calculate_flows_reuse(area_reuse: np.ndarray, flow_reuse: np.ndarray,
                           types_reuse: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    # TODO: treatment types should be a numpy array already
+    """
+        Calculate flows based on different types of reuse (Agricultural, Urban, No-reuse).
+
+        Args:
+            area_reuse (np.ndarray): Area for each type of reuse.
+            flow_reuse (np.ndarray): Flow data for different types of reuse.
+            types_reuse (np.ndarray): Array indicating the type of reuse for each data entry.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                - Flow data for Agricultural reuse.
+                - Flow data for Urban reuse.
+                - Flow data for No-reuse.
+                - Flow per area for Agricultural reuse.
+                - Flow per area for Urban reuse.
+    """
+
     types_reuse = np.array(types_reuse)
 
     # Agricultural
@@ -356,6 +499,17 @@ def calculate_flows_reuse(area_reuse: np.ndarray, flow_reuse: np.ndarray,
 
 
 def benefits_freshwater_with_reuse(population: np.ndarray, flow_urban_reuse: Optional[np.ndarray] = None) -> np.ndarray:
+    """
+        Calculate benefits of freshwater usage considering urban water reuse.
+
+        Args:
+            population (np.ndarray): Population data for various towns.
+            flow_urban_reuse (Optional[np.ndarray]): Flow data for urban water reuse (if available). Default is None.
+
+        Returns:
+            np.ndarray: Calculated benefits of freshwater usage per subcatchment.
+    """
+
     # TODO: cast lists to arrays already in the input script
     water_consumption_arr = np.array(usin.water_consumption)  # (n_towns,)
     tariff_arr = np.array(usin.tariff)
@@ -365,6 +519,7 @@ def benefits_freshwater_with_reuse(population: np.ndarray, flow_urban_reuse: Opt
     volume_consumption = np.einsum(
         "ij,i->ij", population, water_consumption_arr) * 365  # (n_towns, n_outlets)
     if flow_urban_reuse is not None:
+        # REVISE
         # If there is urban reuse, then decrease volume_consumption by fixed percentage
         # TODO: this makes no sense, as the percentage is fixed and not dependent on the
         # actual urban reuse
@@ -382,7 +537,19 @@ def benefits_freshwater_with_reuse(population: np.ndarray, flow_urban_reuse: Opt
 
 def benefits_reuse_selling(flow_agriculture_reuse: np.ndarray, flow_urban_reuse: np.ndarray) -> tuple[
     np.ndarray, np.ndarray]:
-    # TODO: cast these lists to array in the input script
+    """
+        Calculate benefits from selling reclaimed water for agriculture and urban use.
+
+        Args:
+            flow_agriculture_reuse (np.ndarray): Flow data for reclaimed water used in agriculture.
+            flow_urban_reuse (np.ndarray): Flow data for reclaimed water used in urban areas.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]:
+                - Benefits from selling reclaimed water for agriculture.
+                - Benefits from selling reclaimed water for urban use.
+        """
+
     tariff_reclaimed_arr = np.array(usin.tariff_reclaimed)  # (n_towns,)
     collection_efficiency_arr = np.array(usin.collection_efficiency)  # (n_towns,)
 
@@ -396,19 +563,47 @@ def benefits_reuse_selling(flow_agriculture_reuse: np.ndarray, flow_urban_reuse:
 
 
 def calculate_energy_savings(idx_towns: np.ndarray, flow_reuse: np.ndarray) -> np.ndarray:
+    """
+        Calculate energy savings achieved by substituting a source for reclaimed water.
+
+        Args:
+            idx_towns (np.ndarray): Indices of towns.
+            flow_reuse (np.ndarray): Flow data for reclaimed water.
+
+        Returns:
+            np.ndarray: Calculated energy savings for each town.
+        """
+
     # TODO: cast to array in the input script
     c_source_substitute_per_year = np.array(usin.c_source_substitute) * 365
     energy_savings: np.ndarray = flow_reuse * c_source_substitute_per_year[idx_towns]
+
     return energy_savings
 
 
 def calculate_environmental_savings(flow_reuse: np.ndarray, flow_discharged: np.ndarray) -> np.ndarray:
-    environmental_savings: np.ndarray = (
-                                                flow_reuse - flow_discharged) * usin.ww_treatment_after_discharge * 365
+    """
+        Calculate environmental savings obtained by reducing discharged water through reuse.
+
+        Args:
+            flow_reuse (np.ndarray): Flow data for reclaimed water.
+            flow_discharged (np.ndarray): Flow data for discharged water.
+
+        Returns:
+            np.ndarray: Calculated environmental savings achieved by reducing discharged water through reuse.
+        """
+    environmental_savings: np.ndarray = (flow_reuse - flow_discharged) * usin.ww_treatment_after_discharge * 365
+
     return environmental_savings
 
-
+# REVISE
 def costs_freshwater_without_reuse_factory() -> Callable[[np.ndarray, Optional[np.ndarray]], np.ndarray]:
+    """
+        Create a function to calculate costs of freshwater without reuse based on provided parameters.
+
+        Returns:
+            Callable[[np.ndarray, Optional[np.ndarray]], np.ndarray]: A function to calculate costs of freshwater without reuse.
+        """
     # TODO: cast lists to arrays already in the input script
     water_consumption_arr = np.array(usin.water_consumption)  # (n_towns,)
     losses_distribution_arr = np.array(usin.losses_distribution)  # (n_towns,)
@@ -470,6 +665,18 @@ COSTS_FRESHWATER_CALCULATOR = costs_freshwater_without_reuse_factory()
 
 
 def calc_pumping_reuse_costs(radius_buffer: np.ndarray, flow_wwtp: np.ndarray, type_reuse) -> np.ndarray:
+    """
+        Calculate pumping costs for water reuse based on given parameters.
+
+        Args:
+            radius_buffer (np.ndarray): Radius buffer data.
+            flow_wwtp (np.ndarray): Flow data from wastewater treatment plants.
+            type_reuse: Data indicating the type of reuse.
+
+        Returns:
+            np.ndarray: Calculated pumping costs for water reuse.
+        """
+
     costs_pumping_reuse_year = np.zeros(radius_buffer.shape)
     for i, type_reuse_i in enumerate(type_reuse):
         if type_reuse_i in {ReuseType.AGRICULTURAL, ReuseType.URBAN}:
@@ -495,7 +702,17 @@ def calc_pumping_reuse_costs(radius_buffer: np.ndarray, flow_wwtp: np.ndarray, t
     return costs_pumping_reuse_year
 
 
-def onsite_treat_costs(total_pop, cluster_pop):
+def onsite_treat_costs(total_pop: int, cluster_pop: int) -> tuple[int, int, int]:
+    """
+        Calculate the costs associated with onsite wastewater treatment systems.
+
+        Args:
+            total_pop (int): Total population in the area.
+            cluster_pop (int): Population connected to a centralized wastewater treatment system.
+
+        Returns:
+            tuple[int, int, int]: Tuple containing investment costs, operation costs per year, and onsite population.
+        """
     # assumptions
     people_by_unit = 6.2 * 4  # person/septictank 4 people/building
     empty_frequency_year = 2  # times/year/septictank
@@ -509,85 +726,200 @@ def onsite_treat_costs(total_pop, cluster_pop):
 
     return investment_costs, operation_costs_year, onsite_pop
 
-
 def calculate_reuse(idx_nodes: np.ndarray, flows_available: np.ndarray,
                     interpolators: dict[int, dict[str, DataInterpolator]]) -> tuple[
     np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Calculate the parameters for reuse based on available flows and provided interpolators.
+
+    This function iterates through available nodes and their corresponding flow data to determine
+    the reuse parameters such as radius, type of reuse, and required areas by utilizing provided interpolators.
+
+    Args:
+        idx_nodes (np.ndarray): Array of indices representing nodes.
+        flows_available (np.ndarray): Array containing available flow data.
+        interpolators (dict[int, dict[str, DataInterpolator]]): Dictionary of interpolators for each node.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: A tuple containing arrays representing
+        radiuses of reuse, applied flows for reuse, types of reuse, and areas required for reuse.
+    """
+
     radiuses_reuse = np.zeros(flows_available.shape)
     flows_applied_reuse = np.zeros(flows_available.shape)
     types_reuse = np.full(idx_nodes.shape, ReuseType.NO_REUSE)
     areas_reuse = np.zeros(flows_available.shape)
+
+    # Iterate through nodes and available flow data to calculate reuse parameters
     for i, (idx_node, flow) in enumerate(zip(idx_nodes, flows_available)):
         if flow == 0.0:
-            # Available flow is zero, node is pumping station
+            # Available flow is zero, indicating a pumping station node
             continue
+        # Retrieve parameters for reuse using the interpolator for the current node
         radius_min_winner, type_reuse_winner, area_required = get_reuse_from_interpolator(
             flow, interpolators[idx_node])
+
+        # Update arrays with calculated reuse parameters for each node
         radiuses_reuse[i] = radius_min_winner
         types_reuse[i] = type_reuse_winner
         areas_reuse[i] = area_required
-        # Current setup assures the applied reuse flow is equal to the available flow
+
+        # Applied reuse flow is set equal to the available flow for the current node
         flows_applied_reuse[i] = flow
+
     return radiuses_reuse, flows_applied_reuse, types_reuse, areas_reuse
 
 
-def get_reuse_from_interpolator(flow_available: float, interpolators: dict[str, DataInterpolator]) -> tuple[
+def get_reuse_from_interpolator(flow_available: float, interpolators: dict[str, DataInterpolator]) -> Tuple[
     float, ReuseType, float]:
+    """
+        Determine the optimal reuse parameters based on the available flow and the interpolators provided.
+
+        This function iterates over known types of reuse (e.g., Agricultural or Urban), calculates the required area for
+        a given flow based on ideal operational values, and uses interpolators to estimate the minimum radius needed
+        for the calculated area.
+
+        Args:
+            flow_available (float): Available flow for reuse.
+            interpolators (dict[str, DataInterpolator]): Dictionary of interpolators for different types of reuse.
+
+        Returns:
+            Tuple[float, ReuseType, float]: A tuple containing the optimal minimum radius, the type of reuse chosen
+            (Agricultural or Urban), and the corresponding area required for the chosen reuse type.
+        """
+    # Dictionary defining optimal operational values for different types of reuse
     aap = {
         ReuseType.AGRICULTURAL: usin.irr_oper_agr,
         ReuseType.URBAN: usin.irr_oper_urb
     }
+    # Initializing variables for the winning radius and reuse type
     radius_min_winner, type_reuse_winner = float('inf'), None
+
+    # Iterate over each type of reuse and calculate the corresponding area required
     for type_reuse, flow_per_area_optimal in aap.items():
         area_required = flow_available / flow_per_area_optimal
         interpolator = interpolators[f"area__{str(type_reuse)}_to_radius"]
+        # Attempt to interpolate the minimum radius based on the required area
         try:
-            radius_min = interpolator(area_required)
+            radius_min = interpolator(area_required) # Assign a default value in case of interpolation failure
         except:
             radius_min = float('inf')
+
+        # Determine the winning radius and type of reuse
         if radius_min < radius_min_winner:
             radius_min_winner = radius_min
             type_reuse_winner = type_reuse
             area_required_winner = area_required
+
+    # Check if a winning reuse type was determined; raise an assertion error if not found
     assert type_reuse_winner is not None, "Probably all interpolators returned 'inf'."
+
+    # Return the winning radius, type of reuse, and the corresponding area required for the chosen reuse type
     return radius_min_winner, type_reuse_winner, area_required_winner
 
 
 def get_reuse_network_length(idx_nodes: np.ndarray, radiuses: np.ndarray,
                              interpolators: dict[int, dict[str, DataInterpolator]]) -> np.ndarray:
+    """
+        Calculate the length of reuse network based on given radiuses and interpolators.
+
+        This function iterates through the nodes' indices and corresponding radiuses
+        to determine the length of the reuse network using provided interpolators.
+
+        Args:
+            idx_nodes (np.ndarray): Array of indices representing nodes.
+            radiuses (np.ndarray): Array containing radiuses for the reuse network.
+            interpolators (Dict[int, Dict[str, DataInterpolator]]): Dictionary of interpolators for each node.
+
+        Returns:
+            np.ndarray: Array representing the length of the reuse network for each node.
+        """
+
+    # Calculate the length of reuse network for each node using the provided interpolators
     network_length_reuse = np.array([interpolators[idx_node]["radius_to_reuse_network_length"](
         radius) for idx_node, radius in zip(idx_nodes, radiuses)])
+
     return network_length_reuse
 
 
 def get_pop_per_town_per_buffer(idx_nodes: np.ndarray, radiuses: np.ndarray,
                                 interpolators: dict[int, dict[str, DataInterpolator]]) -> np.ndarray:
+    """
+        Calculate the population per town per buffer based on indices, radiuses, and interpolators.
+
+        This function calculates the population per town per buffer based on the nodes' indices,
+        associated radiuses, and the provided interpolators.
+
+        Args:
+            idx_nodes (np.ndarray): Array of indices representing nodes.
+            radiuses (np.ndarray): Array containing radiuses for the buffers.
+            interpolators (Dict[int, Dict[str, DataInterpolator]]): Dictionary of interpolators for each node.
+
+        Returns:
+            np.ndarray: Array representing the population per town per buffer.
+        """
+
+    # Initialize an array to store population per town per buffer
     pop_per_town_per_buffer = np.full((4, idx_nodes.shape[0]), np.nan)
+
+    # Iterate through each town and buffer to calculate the population
     for i_town in range(pop_per_town_per_buffer.shape[0]):
         for i_buffer, (i_node, radius_buffer) in enumerate(zip(idx_nodes, radiuses)):
+            # Calculate population using the appropriate interpolator for each town
             pop_per_town_per_buffer[i_town, i_buffer] = interpolators[i_node][f"radius_to_population__town_{i_town}"](
                 radius_buffer)
+
     return pop_per_town_per_buffer
 
-
+# REVISE: get the number of towns somehow from input
 def get_pop_per_town_per_subcatchment(data_dict: dict[str, np.ndarray]) -> np.ndarray:
+    """
+        Generate an array representing the population per town per subcatchment.
+
+        Args:
+            data_dict (Dict[str, np.ndarray]): Dictionary containing relevant data arrays.
+
+        Returns:
+            np.ndarray: Array representing population per town per subcatchment.
+        """
     # TODO: don't hardcode the number of towns
+    # Define the number of towns (Assuming it is hardcoded for now)
     n_towns = 4
+
+    # Initialize an array to store population per town per subcatchment
     pop_per_town_per_subcatchment = np.zeros((n_towns, data_dict["idx_node"].shape[0]))
+
+    # Iterate through each town to populate the array with population data
     for i_town in range(n_towns):
         pop_per_town_per_subcatchment[i_town,
         :] = data_dict[f"population_served__town_{i_town}"]
+
     return pop_per_town_per_subcatchment
 
 
 def calculate_reuse_reservoir_costs(flow: np.ndarray, type_reuse: np.ndarray) -> np.ndarray:
-    sc_reservoir = calculate_scale_factor(Inv_1=usin.known_inv_cost_reservoir_1, Inv_2=usin.known_inv_cost_reservoir_2,
-                                          Q1=usin.known_reservoir_volume_1, Q2=usin.known_reservoir_volume_2)
+    """
+        Calculate the costs of reservoirs for agricultural and urban reuse based on given flow and reuse types.
+
+        Args:
+            flow (np.ndarray): Array containing flow data.
+            type_reuse (np.ndarray): Array containing type of reuse data.
+
+        Returns:
+            np.ndarray: Array representing the costs of reservoirs for each entry based on flow and reuse type.
+        """
+
+    # Calculate the scale factor for reservoir costs based on known data
+    sc_reservoir = calculate_scale_factor(Inv_1=usin.known_inv_cost_reservoir_1,
+                                          Inv_2=usin.known_inv_cost_reservoir_2,
+                                          Q1=usin.known_reservoir_volume_1,
+                                          Q2=usin.known_reservoir_volume_2)
+    # Initialize an array to store reuse reservoir costs
     reuse_reservoir_costs = np.zeros(flow.shape)
-    # Agricultural + urban
+
+    # Calculate costs for agricultural and urban reuse
     idx_agri_or_urb = (type_reuse == ReuseType.AGRICULTURAL) | (type_reuse == ReuseType.URBAN)
-    reuse_reservoir_costs[idx_agri_or_urb] = (
-                                                     (flow[idx_agri_or_urb] * (
+    reuse_reservoir_costs[idx_agri_or_urb] = ((flow[idx_agri_or_urb] * (
                                                              1.25 / usin.known_reservoir_volume_1)) ** (
                                                          sc_reservoir)) * usin.known_inv_cost_reservoir_1
     return reuse_reservoir_costs
@@ -598,32 +930,78 @@ def calculate_flow_available_reuse(flow_wwtp: np.ndarray) -> np.ndarray:
 
 
 def calculate_flow_discharged(flow_available_reuse: np.ndarray, flow_applied_reuse: np.ndarray) -> np.ndarray:
+    """
+        Calculate the available flow for reuse based on the given flow from WWTP.
+
+        Args:
+            flow_wwtp (np.ndarray): Array containing flow data from WWTP.
+
+        Returns:
+            np.ndarray: Copy of the input array representing the available flow for reuse.
+        """
     flow_discharged: np.ndarray = flow_available_reuse - flow_applied_reuse
     return flow_discharged
 
 
 def calculate_decentralization_degree(flow_wwtp: np.ndarray, pop_per_subcatchment_wwtp: np.ndarray) -> tuple[
     float, float]:
-    # Select only WWTP data
-    # Carry on
+    """
+        Calculate two measures of decentralization based on WWTP flow and population data.
+
+        Args:
+            flow_wwtp (np.ndarray): Array containing flow data from WWTP.
+            pop_per_subcatchment_wwtp (np.ndarray): Array containing population data per subcatchment.
+
+        Returns:
+            tuple[float, float]: Tuple containing two measures of decentralization (Eggimann and Huang).
+        """
+
+    # Calculate total flow from WWTPs
     total_flow = flow_wwtp.sum()
+
+    # Calculate total number of households
     numbers_households = pop_per_subcatchment_wwtp * (1 / usin.inhabit_per_household)
     total_households = numbers_households.sum()
+
+    # Calculate sum of flow per household
     sum_flow_per_hh = (flow_wwtp / numbers_households).sum()
+
+    # Calculate Eggimann's decentralization degree
     dec_degree_eggiman = (total_flow - sum_flow_per_hh) / total_flow
+
+    # Calculate sum of flow by households
     sum_flow_by_hh = (flow_wwtp * numbers_households).sum()
+
+    # Calculate Huang's decentralization degree
     dec_degree_huang = sum_flow_by_hh / (total_flow * total_households)
+
     return dec_degree_eggiman, dec_degree_huang
 
 
 def split_population_wwtp_wwps(pop_per_town_per_subcatchment: np.ndarray, node_types: np.ndarray) -> tuple[
     np.ndarray, np.ndarray]:
+    """
+        Split population data per town per subcatchment into WWTP and WWPS categories.
+
+        Args:
+            pop_per_town_per_subcatchment (np.ndarray): Population data per town per subcatchment.
+            node_types (np.ndarray): Array containing node types.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Tuple containing populations for WWTPs and WWPSs.
+        """
+    # Initialize arrays to store populations for WWTPs and WWPSs
     pop_per_town_per_subcatchment_wwtp = np.zeros(pop_per_town_per_subcatchment.shape)
+    pop_per_town_per_subcatchment_wwps = np.zeros(pop_per_town_per_subcatchment.shape)
+
+    # Check for WWTP nodes and assign population data accordingly
     idx_wwtp = node_types == NodeType.WWTP
     pop_per_town_per_subcatchment_wwtp[:, idx_wwtp] = pop_per_town_per_subcatchment[:, idx_wwtp]
-    pop_per_town_per_subcatchment_wwps = np.zeros(pop_per_town_per_subcatchment.shape)
+
+    # Check for WWPS nodes and assign population data accordingly
     idx_wwps = node_types == NodeType.WWPS
     pop_per_town_per_subcatchment_wwps[:, idx_wwps] = pop_per_town_per_subcatchment[:, idx_wwps]
+
     return pop_per_town_per_subcatchment_wwtp, pop_per_town_per_subcatchment_wwps
 
 
@@ -633,6 +1011,23 @@ def Join_Calcul(
         store_node_results: bool = True,
         store_total_results: bool = True
 ) -> tuple[float, float, Optional[dict[str, Scalar]], Optional[dict[str, np.ndarray]]]:
+    """
+        Perform comprehensive calculations related to wastewater and freshwater management.
+
+        This function handles various computations including costs, benefits, coverage, and metrics
+        related to wastewater treatment, reuse, freshwater management, and onsite treatment.
+
+        Args:
+            data_dict (dict[str, np.ndarray]): Dictionary containing various data arrays.
+            interpolators (dict[int, dict[str, DataInterpolator]]): Dictionary of interpolators.
+            store_node_results (bool, optional): Flag to indicate storing node-wise results (default is True).
+            store_total_results (bool, optional): Flag to indicate storing total results (default is True).
+
+        Returns:
+            tuple[float, float, Optional[dict[str, Scalar]], Optional[dict[str, np.ndarray]]]: A tuple containing
+            benefits over costs ratio, coverage in catchment, results for total metrics, and node-wise results.
+        """
+    
     ww_pipe_inv_costs_old = np.array(
         [PIPELINE_REUSE_INV_COST_CALCULATOR(pipe_length) for pipe_length in data_dict["network_length"]])
 
@@ -647,6 +1042,7 @@ def Join_Calcul(
         ]
     ))
 
+    # REVISE: Keep this?
     #    print("Estimated Maria (+" + str(len(data_dict['idx_node'])) + " WWTPs): " + str(sum(ww_pipe_inv_costs_old)) +
     #          ". Estimated Hossein: (4 WWTPs):" + str(ww_pipe_inv_costs))
 
